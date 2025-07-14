@@ -1,8 +1,9 @@
 import torch
 import typer
 from pathlib import Path
-from transformers import AutoModel
+from transformers import AutoConfig, AutoModelForCausalLM
 from .model_compressor import SVDCompressor
+import shutil
 
 app = typer.Typer(pretty_exceptions_show_locals=False)
 
@@ -32,7 +33,10 @@ def main(
     typer.echo(f"📂 Loading model from: {model_path}")
 
     # Load a generic model
-    model = AutoModel.from_pretrained(
+    # model = AutoModel.from_pretrained(
+    #     model_path, torch_dtype=torch.bfloat16, device_map="auto"
+    # )
+    model = AutoModelForCausalLM.from_pretrained(
         model_path, torch_dtype=torch.bfloat16, device_map="auto"
     )
 
@@ -45,6 +49,21 @@ def main(
     compressed_model.save_pretrained(
         output_path, max_shard_size=shard_size, safe_serialization=True
     )
+
+    print("🔗 Copying tokenizer configuration files...")
+    tokenizer_files_to_copy = [
+        "tokenizer.model",
+        "tokenizer.json",
+        "tokenizer_config.json",
+        "special_tokens_map.json",
+    ]
+    for filename in tokenizer_files_to_copy:
+        source_file = model_path / filename
+        destination_file = output_path / filename
+        if source_file.exists():
+            shutil.copy(source_file, destination_file)
+            print(f"   - Copied {filename}")
+
     typer.secho(
         f"✅ Successfully saved compressed model to: {output_path}",
         fg=typer.colors.GREEN,
@@ -52,4 +71,4 @@ def main(
 
 
 if __name__ == "__main__":
-    app()
+    app()  # pragma: no cover
